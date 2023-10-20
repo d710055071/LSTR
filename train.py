@@ -191,7 +191,7 @@ def train(training_dbs, validation_db, resume_from = None,start_iter=0, freeze=F
                 if min_loss is None or min_loss > loss_value:
                     min_loss = loss_value
                     update_best_model = True
-                nnet.save_params(iteration,update_best_model)
+                nnet.save_params(iteration,update_best_model,min_loss)
 
             if iteration % stepsize == 0:
                 learning_rate /= decay_rate

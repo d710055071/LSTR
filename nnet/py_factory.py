@@ -180,26 +180,29 @@ class NetworkFactory(object):
             self.model.load_state_dict(model_dict)
     def resume_from(self,checkpoint):
         start_iter = 0
+        min_loss = None
         if checkpoint:
             ckpt = torch.load(checkpoint)
             self.model.load_state_dict(ckpt["model"])
             self.optimizer.load_state_dict(ckpt["optimizer"])
             start_iter = ckpt["start_iter"]
-        return start_iter
+            min_loss = ckpt["min_val_loss"]
+        return start_iter,min_loss
     # def save_params(self, iteration):
     #     cache_file = system_configs.snapshot_file.format(iteration)
     #     print("saving model to {}".format(cache_file))
     #     with open(cache_file, "wb") as f:
     #         params = self.model.state_dict()
     #         torch.save(params, f)
-    def save_params(self,iteration,update_best):
+    def save_params(self,iteration,update_best,min_val_loss):
         # check_point
         cache_file = system_configs.snapshot_file.format(iteration)
         # 保存当前chekcpoint
         checkpoint = {
             'start_iter':iteration,
             'model':self.model.state_dict(),
-            'optimizer':self.optimizer.state_dict()
+            'optimizer':self.optimizer.state_dict(),
+            'min_val_loss':min_val_loss,
         }
         torch.save(checkpoint,cache_file)
 

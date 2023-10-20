@@ -102,7 +102,7 @@ def main():
     print_iter = 100
     iteration = 0
     min_loss = None
-    iteration = nnet.resume_from(args.resume_from)
+    iteration ,min_loss = nnet.resume_from(args.resume_from)
     print("*"*50)
     print("start iteration:",iteration)
     print("*"*50)
@@ -130,7 +130,7 @@ def main():
         print("*"*50)
         print("save checkpoint...")
         print("*"*50)
-        nnet.save_params(iteration,update_best_model)
+        nnet.save_params(iteration,update_best_model,min_loss)
 
             
 if __name__ == "__main__":
