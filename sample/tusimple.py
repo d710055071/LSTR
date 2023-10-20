@@ -44,18 +44,26 @@ def kp_detection(db, k_ind):
             img, line_strings, mask = db.transform(image=img, line_strings=line_strings, segmentation_maps=mask)
             line_strings.clip_out_of_image_()
             new_anno = {'path': item['path'], 'lanes': db.linestrings_to_lanes(line_strings)}
-            new_anno['categories'] = item['categories']
+            # new_anno['categories'] = item['categories']
+            new_anno['categories'] = item['old_anno']['categories']
             label = db._transform_annotation(new_anno, img_wh=(input_size[1], input_size[0]))['label']
 
         # clip polys
         tgt_ids   = label[:, 0]
         label = label[tgt_ids > 0]
 
-        # make lower the same
-        label[:, 1][label[:, 1] < 0] = 1
-        label[:, 1][...] = np.min(label[:, 1])
 
+        try :
+            # make lower the same
+            label[:, 1][label[:, 1] < 0] = 1
+            label[:, 1][...] = np.min(label[:, 1])
+
+        except Exception as e :
+            print(label)
+        finally :
+            pass
         label = np.stack([label] * batch_size, axis=0)
+
         gt_lanes.append(torch.from_numpy(label.astype(np.float32)))
 
         img = (img / 255.).astype(np.float32)

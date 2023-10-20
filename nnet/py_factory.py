@@ -2,6 +2,7 @@ import os
 import torch
 import importlib
 import torch.nn as nn
+import shutil
 from thop import profile, clever_format
 from config import system_configs
 from models.py_utils.data_parallel import DataParallel
@@ -51,7 +52,7 @@ class NetworkFactory(object):
         self.network = Network(self.model, self.loss)
         self.network = DataParallel(self.network, chunk_sizes=system_configs.chunk_sizes)
         self.flag    = flag
-
+        self.best_model_name = None
         # Count total parameters
         total_params = 0
         for params in self.model.parameters():
@@ -62,11 +63,11 @@ class NetworkFactory(object):
         print("Total parameters: {}".format(total_params))
 
         # Count MACs when input is 360 x 640 x 3
-        input_test = torch.randn(1, 3, 360, 640).cuda()
-        input_mask = torch.randn(1, 3, 360, 640).cuda()
-        macs, params, = profile(self.model, inputs=(input_test, input_mask), verbose=False)
-        macs, _ = clever_format([macs, params], "%.3f")
-        print('MACs: {}'.format(macs))
+        # input_test = torch.randn(1, 3, 360, 640).cuda()
+        # input_mask = torch.randn(1, 3, 360, 640).cuda()
+        # macs, params, = profile(self.model, inputs=(input_test, input_mask), verbose=False)
+        # macs, _ = clever_format([macs, params], "%.3f")
+        # print('MACs: {}'.format(macs))
 
 
         if system_configs.opt_algo == "adam":
@@ -123,7 +124,7 @@ class NetworkFactory(object):
 
         return loss, loss_dict
 
-    def validate(self,
+    def val(self,
                  iteration,
                  save,
                  viz_split,
@@ -134,6 +135,9 @@ class NetworkFactory(object):
         with torch.no_grad():
             xs = [x.cuda(non_blocking=True) for x in xs]
             ys = [y.cuda(non_blocking=True) for y in ys]
+
+            torch.cuda.synchronize()
+
             loss_kp = self.network(iteration,
                                    save,
                                    viz_split,
@@ -174,11 +178,46 @@ class NetworkFactory(object):
             model_dict.update(pretrained_dict)
 
             self.model.load_state_dict(model_dict)
-
-
-    def save_params(self, iteration):
+    def resume_from(self,checkpoint):
+        start_iter = 0
+        if checkpoint:
+            ckpt = torch.load(checkpoint)
+            self.model.load_state_dict(ckpt["model"])
+            self.optimizer.load_state_dict(ckpt["optimizer"])
+            start_iter = ckpt["start_iter"]
+        return start_iter
+    # def save_params(self, iteration):
+    #     cache_file = system_configs.snapshot_file.format(iteration)
+    #     print("saving model to {}".format(cache_file))
+    #     with open(cache_file, "wb") as f:
+    #         params = self.model.state_dict()
+    #         torch.save(params, f)
+    def save_params(self,iteration,update_best):
+        # check_point
         cache_file = system_configs.snapshot_file.format(iteration)
-        print("saving model to {}".format(cache_file))
-        with open(cache_file, "wb") as f:
-            params = self.model.state_dict()
-            torch.save(params, f)
+        # 保存当前chekcpoint
+        checkpoint = {
+            'start_iter':iteration,
+            'model':self.model.state_dict(),
+            'optimizer':self.optimizer.state_dict()
+        }
+        torch.save(checkpoint,cache_file)
+
+        # last link
+        latest_file = system_configs.snapshot_file.format("latest")
+        # 判断文件链接是否存在
+        if os.path.islink(latest_file):
+            # 删除链接
+            os.remove(latest_file)
+        # 重新创建链接
+        os.symlink(os.path.basename(cache_file),latest_file)
+        if update_best:
+
+            best_filename = system_configs.snapshot_file.format(str(iteration) + "_best")
+            
+            if self.best_model_name is not None :
+                os.remove(system_configs.snapshot_file.format(self.best_model_name))
+            self.best_model_name = str(iteration) + "_best"
+            with open(best_filename, "wb") as f:
+                params = self.model.state_dict()
+                torch.save(params, f)

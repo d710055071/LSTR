@@ -68,7 +68,7 @@ class Config:
         self._configs["num_queries"] = 100
 
         # LaneDetection Setting
-        self._configs["max_lanes"] = None
+        self._configs["max_lanes"] = 36
 
     @property
     def max_lanes(self):

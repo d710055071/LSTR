@@ -103,7 +103,6 @@ class BasicBlock(nn.Module):
         out = self.relu(out)
 
         return out
-
 class kp(nn.Module):
     def __init__(self,
                  flag=False,
@@ -190,9 +189,13 @@ class kp(nn.Module):
         p = self.layer2(p)  # B 32 45 80
         p = self.layer3(p)  # B 64 23 40
         p = self.layer4(p)  # B 128 12 20
+
+
         pmasks = F.interpolate(masks[:, 0, :, :][None], size=p.shape[-2:]).to(torch.bool)[0]
         pos    = self.position_embedding(p, pmasks)
+
         hs, _, weights  = self.transformer(self.input_proj(p), pmasks, self.query_embed.weight, pos)
+
         output_class    = self.class_embed(hs)
         output_specific = self.specific_embed(hs)
         output_shared   = self.shared_embed(hs)
@@ -229,7 +232,8 @@ class AELoss(nn.Module):
                  ):
         super(AELoss, self).__init__()
         self.debug_path  = debug_path
-        weight_dict = {'loss_ce': 3, 'loss_curves': 5, 'loss_lowers': 2, 'loss_uppers': 2}
+        weight_dict = {'loss_ce': 2, 'loss_curves': 5, 'loss_lowers': 2, 'loss_uppers': 2}
+        # weight_dict = {'loss_ce': 2, 'loss_curves': 5, 'loss_lowers': 2, 'loss_uppers': 2}
         # cardinality is not used to propagate loss
         matcher = build_matcher(set_cost_class=weight_dict['loss_ce'],
                                 curves_weight=weight_dict['loss_curves'],
@@ -280,13 +284,16 @@ class AELoss(nn.Module):
             save_dir = os.path.join(self.debug_path, viz_split)
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
-            save_name = 'iter_{}_layer_{}'.format(iteration % 5000, which_stack)
+            # save_name = 'iter_{}_layer_{}'.format(iteration % 5000, which_stack)
+            save_name = 'iter_{}_layer_{}'.format(iteration, int(iteration // 5000))
             save_path = os.path.join(save_dir, save_name)
             with torch.no_grad():
                 gt_viz_inputs = targets[0]
                 tgt_labels = [tgt[:, 0].long() for tgt in gt_cluxy]
                 pred_labels = outputs['pred_logits'].detach()
                 prob = F.softmax(pred_labels, -1)
+
+                
                 scores, pred_labels = prob.max(-1)  # 4 10
 
                 pred_curves = outputs['pred_curves'].detach()

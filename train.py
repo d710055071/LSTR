@@ -26,13 +26,14 @@ torch.backends.cudnn.benchmark = True
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train CornerNet")
-    parser.add_argument("cfg_file", help="config file", type=str)
+    parser.add_argument("--cfg_file", default='LSTR',help="config file", type=str)
     parser.add_argument("--iter", dest="start_iter",
                         help="train at iteration i",
                         default=0, type=int)
     parser.add_argument("--threads", dest="threads", default=4, type=int)
     parser.add_argument("--freeze", action="store_true")
-
+    # parser.add_argument("--resume-from",default="/mnt/sda/mycode/LSTR/cache/nnet/LSTR/LSTR_latest.pkl",type=str)
+    parser.add_argument("--resume-from",default=None,type=str)
     args = parser.parse_args()
     return args
 
@@ -72,7 +73,7 @@ def init_parallel_jobs(dbs, queue, fn):
         task.start()
     return tasks
 
-def train(training_dbs, validation_db, start_iter=0, freeze=False):
+def train(training_dbs, validation_db, resume_from = None,start_iter=0, freeze=False):
     learning_rate    = system_configs.learning_rate
     max_iteration    = system_configs.max_iter
     pretrained_model = system_configs.pretrain
@@ -88,10 +89,12 @@ def train(training_dbs, validation_db, start_iter=0, freeze=False):
     validation_size = len(validation_db.db_inds)
 
     # queues storing data for training
+    # training_queue   = Queue(1) # 5
     training_queue   = Queue(system_configs.prefetch_size) # 5
     validation_queue = Queue(5)
 
     # queues storing pinned data for training
+    # pinned_training_queue   = queue.Queue(1) # 5
     pinned_training_queue   = queue.Queue(system_configs.prefetch_size) # 5
     pinned_validation_queue = queue.Queue(5)
 
@@ -129,10 +132,13 @@ def train(training_dbs, validation_db, start_iter=0, freeze=False):
         print("loading from pretrained model")
         nnet.load_pretrained_params(pretrained_model)
 
+
+    start_iter = nnet.resume_from(resume_from)
+
     if start_iter:
         learning_rate /= (decay_rate ** (start_iter // stepsize))
 
-        nnet.load_params(start_iter)
+        # nnet.load_params(start_iter)
         nnet.set_lr(learning_rate)
         print("training starts from iteration {} with learning_rate {}".format(start_iter + 1, learning_rate))
     else:
@@ -145,11 +151,11 @@ def train(training_dbs, validation_db, start_iter=0, freeze=False):
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
-
+    min_loss = None
     with stdout_to_tqdm() as save_stdout:
         for iteration in metric_logger.log_every(tqdm(range(start_iter + 1, max_iteration + 1),
                                                       file=save_stdout, ncols=67),
-                                                 print_freq=10, header=header):
+                                                 print_freq=500, header=header):
 
             training = pinned_training_queue.get(block=True)
             viz_split = 'train'
@@ -169,16 +175,23 @@ def train(training_dbs, validation_db, start_iter=0, freeze=False):
                 save = True
                 validation = pinned_validation_queue.get(block=True)
                 (val_set_loss, val_loss_dict) \
-                    = nnet.validate(iteration, save, viz_split, **validation)
+                    = nnet.val(iteration, save, viz_split, **validation)
                 (loss_dict_reduced, loss_dict_reduced_unscaled, loss_dict_reduced_scaled, loss_value) = val_loss_dict
+                print('*'*100)
                 print('[VAL LOG]\t[Saving training and evaluating images...]')
-                metric_logger.update(loss=loss_value, **loss_dict_reduced_scaled, **loss_dict_reduced_unscaled)
-                metric_logger.update(class_error=loss_dict_reduced['class_error'])
-                metric_logger.update(lr=learning_rate)
+                print("loss: {:.4f} class_error: {:.4f}".format(loss_value,loss_dict_reduced['class_error']))
+                print('*'*100)
+                # metric_logger.update(loss=loss_value, **loss_dict_reduced_scaled, **loss_dict_reduced_unscaled)
+                # metric_logger.update(class_error=loss_dict_reduced['class_error'])
+                # metric_logger.update(lr=learning_rate)
                 nnet.train_mode()
 
             if iteration % snapshot == 0:
-                nnet.save_params(iteration)
+                update_best_model = False
+                if min_loss is None or min_loss > loss_value:
+                    min_loss = loss_value
+                    update_best_model = True
+                nnet.save_params(iteration,update_best_model)
 
             if iteration % stepsize == 0:
                 learning_rate /= decay_rate
@@ -198,8 +211,7 @@ def train(training_dbs, validation_db, start_iter=0, freeze=False):
         training_task.terminate()
     for validation_task in validation_tasks:
         validation_task.terminate()
-
-if __name__ == "__main__":
+def main():
     args = parse_args()
 
     cfg_file = os.path.join(system_configs.config_dir, args.cfg_file + ".json")
@@ -230,4 +242,12 @@ if __name__ == "__main__":
     print("len of testing db: {}".format(len(validation_db.db_inds)))
 
     print("freeze the pretrained network: {}".format(args.freeze))
-    train(training_dbs, validation_db, args.start_iter, args.freeze) # 0
+
+    train(training_dbs, validation_db, args.resume_from, args.start_iter, args.freeze) # 0
+
+import profile
+
+if __name__ == "__main__":
+    # profile.run('main()')
+
+    main()

@@ -37,12 +37,12 @@ GT_COLOR = [PINK, CYAN, ORANGE, YELLOW, BLUE]
 PRED_COLOR = [RED, GREEN, DARK_GREEN, PURPLE, CHOCOLATE, PEACHPUFF, STATEGRAY]
 PRED_HIT_COLOR = GREEN
 PRED_MISS_COLOR = RED
-IMAGENET_MEAN = np.array([0.485, 0.456, 0.406])
+IMAGENET_MEAN = np.array([0.485, 0.456, 0.406]) #RGB
 IMAGENET_STD = np.array([0.229, 0.224, 0.225])
 
-class TUSIMPLE(DETECTION):
+class MxTUSIMPLE(DETECTION):
     def __init__(self, db_config, split):
-        super(TUSIMPLE, self).__init__(db_config)
+        super(MxTUSIMPLE, self).__init__(db_config)
         data_dir   = system_configs.data_dir
         # result_dir = system_configs.result_dir
         cache_dir   = system_configs.cache_dir
@@ -52,28 +52,25 @@ class TUSIMPLE(DETECTION):
 
         self._split = split
         self._dataset = {
-            "train": ['label_data_0313', 'label_data_0601'],
+            "train": ['label_data_20230919', 'label_data_20230911', 'label_data_20230830'],
             "test": ['test_label'],
-            "train+val": ['label_data_0313', 'label_data_0601', 'label_data_0531'],
-            "val": ['label_data_0531'],
+            "train+val": ['label_data_20230919', 'label_data_20230911', 'label_data_20230830','label_data_20230904'],
+            "val": ['label_data_20230904'],
         }[self._split]
 
-        self.root = os.path.join(data_dir, 'TuSimple', 'LaneDetection')
+        self.root = os.path.join(data_dir, 'MxTuSimple', 'LaneDetection')
         if self.root is None:
             raise Exception('Please specify the root directory')
-        self.img_w, self.img_h = 1280, 720  # tusimple original image resolution
+        self.img_w, self.img_h = inp_w, inp_h  # tusimple original image resolution
         self.max_points = 0
         self.normalize = True
         self.to_tensor = ToTensor()
-        # self.aug_chance = 1.0
         self.aug_chance = 0.9090909090909091
         self._image_file = []
 
-        self.augmentations = [
-                              {'name': 'Affine', 'parameters': {'rotate': (-10, 10)}},
+        self.augmentations = [{'name': 'Affine', 'parameters': {'rotate': (-10, 10)}},
                               {'name': 'HorizontalFlip', 'parameters': {'p': 0.5}},
-                            # {'name': 'HorizontalFlip', 'parameters': {'p': 1.0}},
-                              {'name': 'CropToFixedSize', 'parameters': {'height': 648, 'width': 1152}}]
+                              {'name': 'CropToFixedSize', 'parameters': {'height': 1080, 'width': 1920}}]
 
 
         # Force max_lanes, used when evaluating testing with models trained on other datasets
@@ -109,7 +106,6 @@ class TUSIMPLE(DETECTION):
         if self.augmentations is not None:
             augmentations = [getattr(iaa, aug['name'])(**aug['parameters'])
                              for aug in self.augmentations]  # add augmentation
-
         transformations = iaa.Sequential([Resize({'height': inp_h, 'width': inp_w})])
         self.transform = iaa.Sequential([iaa.Sometimes(then_list=augmentations, p=self.aug_chance), transformations])
 
@@ -150,6 +146,8 @@ class TUSIMPLE(DETECTION):
                 lines = anno_obj.readlines()
             for line in lines:
                 data = json.loads(line) # lanes list h_sample list raw_file str
+                if 'categories' in data:
+                    categories = data['categories']
                 y_samples = data['h_samples']
                 gt_lanes = data['lanes']  # 4 lanes
                 lanes = [[(x, y) for (x, y) in zip(lane, y_samples) if x >= 0] for lane in gt_lanes]
@@ -166,15 +164,16 @@ class TUSIMPLE(DETECTION):
                     'org_lanes': gt_lanes,
                     'lanes': lanes,
                     'aug': False,
-                    'y_samples': y_samples
+                    'y_samples': y_samples,
+                    'categories':categories
                 }
                 image_id += 1
 
     def _get_img_heigth(self, path):
-        return 720
+        return 1080
 
     def _get_img_width(self, path):
-        return 1280
+        return 1920
 
     def _transform_annotation(self, anno, img_wh=None):
         if img_wh is None:
@@ -206,7 +205,6 @@ class TUSIMPLE(DETECTION):
             'old_anno': anno,
             'categories': [cat for _, cat in old_lanes]
         }
-
         return new_anno
 
     def _transform_annotations(self):
@@ -265,7 +263,7 @@ class TUSIMPLE(DETECTION):
             img, line_strings = self.transform(image=img, line_strings=line_strings)
             line_strings.clip_out_of_image_()
             new_anno = {'path': item['path'], 'lanes': self.linestrings_to_lanes(line_strings)}
-            new_anno['categories'] = item['categories']
+            new_anno['categories'] = item['old_anno']['categories']
             label = self._transform_annotation(new_anno, img_wh=(self.img_w, self.img_h))['label']
 
         img = img / 255.
