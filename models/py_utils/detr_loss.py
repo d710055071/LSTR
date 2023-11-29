@@ -92,17 +92,32 @@ class SetCriterion(nn.Module):
         weights = weights / torch.max(weights)
 
         # Calculate the predicted xs
-        pred_xs = src_polys[:, 0] / (ys - src_polys[:, 1]) ** 2 + src_polys[:, 2] / (ys - src_polys[:, 1]) + \
-                  src_polys[:, 3] + src_polys[:, 4] * ys - src_polys[:, 5]
+        # pred_xs = src_polys[:, 0] / (ys - src_polys[:, 1]) ** 2 + src_polys[:, 2] / (ys - src_polys[:, 1]) + \
+        #           src_polys[:, 3] + src_polys[:, 4] * ys - src_polys[:, 5]
+        pred_xs = src_polys[:, 0] / (ys - src_polys[:, 1]) ** 2 + src_polys[:, 2] / (ys - src_polys[:, 1]) + src_polys[:, 3] + src_polys[:, 4] * ys - src_polys[:, 1]*src_polys[:, 4]
+        # pred_xs = src_polys[:, 0] * ys**5 + src_polys[:, 1] * ys**4 + src_polys[:, 2] * ys**3 + \
+        #           src_polys[:, 3] * ys**2 + src_polys[:, 4] * ys + src_polys[:, 5]
+            
 
         pred_xs = pred_xs * weights
         pred_xs = pred_xs.transpose(1, 0)
         target_xs = target_xs.transpose(1, 0) * weights
         target_xs = target_xs.transpose(1, 0)
 
+
+        # diff1 = -2 * src_polys[:, 0] / (ys - src_polys[:, 1]) ** 3 -     src_polys[:, 2] / (ys - src_polys[:, 1]) ** 2 + src_polys[:, 4]
+        # diff2 = 6 *  src_polys[:, 0] / (ys - src_polys[:, 1]) ** 4 + 2 * src_polys[:, 2] / (ys - src_polys[:, 1]) ** 3
+
+        # pred_diffs = torch.abs(diff2) / (1 + diff1 ** 2) ** 1.5
+
+        # detached_pred_diffs = pred_diffs.detach()
+        # detached_pred_diffs = detached_pred_diffs.transpose(1, 0)
+
         loss_lowers = F.l1_loss(src_lowers, target_lowers, reduction='none')
         loss_uppers = F.l1_loss(src_uppers, target_uppers, reduction='none')
+
         loss_polys  = F.l1_loss(pred_xs[valid_xs], target_xs[valid_xs], reduction='none')
+        # loss_polys = F.l1_loss(pred_xs[valid_xs] * (detached_pred_diffs[valid_xs] + 1), target_xs[valid_xs] * (detached_pred_diffs[valid_xs] + 1), reduction='none')
 
         losses = {}
         losses['loss_lowers']  = loss_lowers.sum() / num_curves

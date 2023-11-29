@@ -76,7 +76,8 @@ def save_batch_image_with_curves(batch_image,
                                 batch_labels,
                                 file_name,
                                 nrow=2,
-                                padding=2):
+                                padding=2,
+                                **kwargs):
     '''
     batch_image: [batch_size, channel, height, width]
     batch_joints: [batch_size, num_joints, 3],
@@ -127,7 +128,8 @@ def save_batch_image_with_dbs(batch_image,
                               batch_labels,
                               file_name,
                               nrow=2,
-                              padding=2):
+                              padding=2,
+                              **kwargs):
     '''
     batch_image: [batch_size, channel, height, width]
     batch_joints: [batch_size, num_joints, 3],
@@ -167,8 +169,9 @@ def save_batch_image_with_dbs(batch_image,
                     points = np.zeros((len(ys), 2), dtype=np.int32)
                     points[:, 1] = (ys * H).astype(int)
                     # Calculate the predicted xs
-                    points[:, 0] = ((lane[0] / (ys - lane[1]) ** 2 + lane[2] / (ys - lane[1]) + lane[3] + lane[4] * ys - lane[5])
-                                    * W).astype(int)
+                    # points[:, 0] = ((lane[0]*ys**5 + lane[1]*ys**4 + lane[2]*ys**3 + lane[3]*ys**2 + lane[4]*ys + lane[5])* W).astype(int)
+                    
+                    points[:, 0] = ((lane[0] / (ys - lane[1]) ** 2 + lane[2] / (ys - lane[1]) + lane[3] + lane[4] * ys - lane[1]*lane[4])* W).astype(int)
                     points = points[(points[:, 0] > 0) & (points[:, 0] < W)]
                     points[:, 0] += x * width + padding
                     points[:, 1] += y * height + padding
@@ -177,15 +180,7 @@ def save_batch_image_with_dbs(batch_image,
             k = k + 1
     cv2.imwrite(file_name, ndarr)
 
-def save_debug_images_boxes(input, tgt_curves, tgt_labels,
-                            pred_curves, pred_labels, prefix=None):
-    save_batch_image_with_curves(
-        input, tgt_curves, tgt_labels,
-        '{}_gt.jpg'.format(prefix)
-    )
-
-    save_batch_image_with_dbs(
-        input, pred_curves, pred_labels,
-        '{}_pred.jpg'.format(prefix)
-    )
+def save_debug_images_boxes(input, tgt_curves, tgt_labels,pred_curves, pred_labels, prefix=None,**kwargs):
+    save_batch_image_with_curves(input, tgt_curves, tgt_labels,'{}_gt.jpg'.format(prefix),**kwargs)
+    save_batch_image_with_dbs(input, pred_curves, pred_labels,'{}_pred.jpg'.format(prefix),**kwargs)
 

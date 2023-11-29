@@ -2,6 +2,7 @@
 *.pkl
 *.pyc
 results/
+runs/
 
 
 

@@ -30,8 +30,8 @@ class MxTUSIMPLE_New(Dataset):
         self._image_file = []
         self.normalize = True
         self.to_tensor = F.ToTensor()
-        # self.aug_chance = 0.9090909090909091
-        self.aug_chance = 0.5
+        self.aug_chance = 0.9090909090909091
+        # self.aug_chance = 0.5
         self._split = split
         # 配置数据
         self._dataset = {
@@ -113,6 +113,7 @@ class MxTUSIMPLE_New(Dataset):
                 data = json.loads(line) # lanes list h_sample list raw_file str
                 if 'categories' in data:
                     categories = data['categories']
+                    # categories =  [1] * len(data['lanes'])
                 y_samples = data['h_samples']
                 gt_lanes = data['lanes']  # 4 lanes
                 lanes = [[(x, y) for (x, y) in zip(lane, y_samples) if x >= 0] for lane in gt_lanes]
@@ -219,8 +220,6 @@ class MxTUSIMPLE_New(Dataset):
         new_anno['categories'] = item['old_anno']['categories']
         label = self._transform_annotation(new_anno, img_wh=(self.img_w, self.img_h))['label']
         
-        # img = self.to_tensor(img.astype(np.float32))
-        # img = self.to_tensor(img.astype(np.float32))
         img = img / 255.
         # if self.normalize:
         #     img = (img - IMAGENET_MEAN) / IMAGENET_STD
@@ -229,4 +228,4 @@ class MxTUSIMPLE_New(Dataset):
         #     img = self.ColorJitter(img)
 
         mask = np.logical_not(mask[:, :, :, 0]).astype(np.float32)
-        return (img, label, mask, idx)
+        return (img, label, mask, idx,item["path"])

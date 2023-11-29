@@ -19,7 +19,9 @@ class Transformer(nn.Module):
 
     def __init__(self, d_model=512, nhead=8, num_encoder_layers=6,
                  num_decoder_layers=6, dim_feedforward=2048, dropout=0.1,
-                 activation="relu", normalize_before=False,
+                #  activation="leaky_relu",
+                activation="relu", 
+                 normalize_before=False,
                  return_intermediate_dec=False):
         super().__init__()
         encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward,
@@ -133,7 +135,9 @@ class TransformerDecoder(nn.Module):
 class TransformerEncoderLayer(nn.Module):
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
-                 activation="relu", normalize_before=False):
+                #  activation="leaky_relu",
+                activation="relu", 
+                   normalize_before=False):
         super().__init__()
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         # Implementation of Feedforward model
@@ -201,7 +205,9 @@ class TransformerEncoderLayer(nn.Module):
 class TransformerDecoderLayer(nn.Module):
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
-                 activation="relu", normalize_before=False):
+                #  activation="leaky_relu", 
+                activation="relu", 
+                 normalize_before=False):
         super().__init__()
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         self.multihead_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
@@ -328,4 +334,8 @@ def _get_activation_fn(activation):
         return F.gelu
     if activation == "glu":
         return F.glu
+    if activation == "relu6":
+        return F.relu6
+    if activation == "leaky_relu":
+        return F.leaky_relu
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")

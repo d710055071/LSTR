@@ -27,7 +27,9 @@ class BasicBlock(nn.Module):
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = norm_layer(planes)
-        self.relu = nn.ReLU(inplace=True)
+        # self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU6(inplace=True)
+        # self.relu = nn.LeakyReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = norm_layer(planes)
         self.downsample = downsample
@@ -73,7 +75,9 @@ class Bottleneck(nn.Module):
         self.bn2 = norm_layer(width)
         self.conv3 = conv1x1(width, planes * self.expansion)
         self.bn3 = norm_layer(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        # self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU6(inplace=True)
+        # self.relu = nn.LeakyReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
 
@@ -108,7 +112,9 @@ class model(kp):
         res101 Bottleneck [3, 4, 23, 3]
         res152 Bottleneck [3, 8, 36, 3]
         """
-
+        # "res_layers": [1, 2, 2, 2],
+        # "res_dims": [32, 64, 128, 256],
+        # "res_strides": [1, 2, 2, 2],
         layers          = system_configs.res_layers
         res_dims        = system_configs.res_dims
         res_strides     = system_configs.res_strides

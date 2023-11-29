@@ -70,7 +70,8 @@ class MLP(nn.Module):
 
     def forward(self, x):
         for i, layer in enumerate(self.layers):
-            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
+            # x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
+            x = F.relu6(layer(x)) if i < self.num_layers - 1 else layer(x)
         return x
 
 class BasicBlock(nn.Module):
@@ -81,6 +82,8 @@ class BasicBlock(nn.Module):
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
+        # self.relu = nn.ReLU6(inplace=True)
+        # self.relu = nn.LeakyReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
         self.downsample = downsample
@@ -129,13 +132,17 @@ class kp(nn.Module):
         super(kp, self).__init__()
         self.flag = flag
         # above all waste not used
-        self.norm_layer = norm_layer
+        # self.norm_layer = norm_layer
 
         self.inplanes = res_dims[0]
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
                                bias=False)
-        self.bn1 = self.norm_layer(self.inplanes)
-        self.relu = nn.ReLU(inplace=True)
+        
+        self.bn1 = nn.BatchNorm2d(self.inplanes)
+        # self.bn1 = self.norm_layer(self.inplanes)
+        # self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU6(inplace=True)
+        # self.relu = nn.LeakyReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         self.layer1 = self._make_layer(block, res_dims[0], layers[0], stride=res_strides[0])
@@ -159,6 +166,10 @@ class kp(nn.Module):
                                              return_intermediate_dec=return_intermediate)
 
         self.class_embed    = nn.Linear(hidden_dim, num_cls)
+        # self.class_embed2   = nn.Linear(hidden_dim*2, num_cls)
+        # self.class_embed    = MLP(hidden_dim, hidden_dim, num_cls, mlp_layers)
+
+        # self.class_embed    = MLP(hidden_dim,hidden_dim, num_cls,mlp_layers)
         self.specific_embed = MLP(hidden_dim, hidden_dim, lsp_dim - 4, mlp_layers)
         self.shared_embed   = MLP(hidden_dim, hidden_dim, 4, mlp_layers)
 
@@ -169,6 +180,8 @@ class kp(nn.Module):
                 nn.Conv2d(self.inplanes, planes * block.expansion,
                           kernel_size=1, stride=stride, bias=False),
                 nn.BatchNorm2d(planes * block.expansion, momentum=BN_MOMENTUM),
+                # nn.LeakyReLU(inplace=True)
+                nn.ReLU6(inplace=True)
             )
         layers = []
         layers.append(block(self.inplanes, planes, stride, downsample))
@@ -197,6 +210,7 @@ class kp(nn.Module):
         hs, _, weights  = self.transformer(self.input_proj(p), pmasks, self.query_embed.weight, pos)
 
         output_class    = self.class_embed(hs)
+        # output_class    = self.class_embed2(output_class)
         output_specific = self.specific_embed(hs)
         output_shared   = self.shared_embed(hs)
         output_shared   = torch.mean(output_shared, dim=-2, keepdim=True)
@@ -232,13 +246,17 @@ class AELoss(nn.Module):
                  ):
         super(AELoss, self).__init__()
         self.debug_path  = debug_path
-        weight_dict = {'loss_ce': 2, 'loss_curves': 5, 'loss_lowers': 2, 'loss_uppers': 2}
+        weight_dict = {'loss_ce':2, 'loss_curves':5, 'loss_lowers': 2, 'loss_uppers': 2}
         # weight_dict = {'loss_ce': 2, 'loss_curves': 5, 'loss_lowers': 2, 'loss_uppers': 2}
         # cardinality is not used to propagate loss
         matcher = build_matcher(set_cost_class=weight_dict['loss_ce'],
                                 curves_weight=weight_dict['loss_curves'],
                                 lower_weight=weight_dict['loss_lowers'],
                                 upper_weight=weight_dict['loss_uppers'])
+        # matcher = build_matcher(set_cost_class=2.0,
+        #                         curves_weight=5.0,
+        #                         lower_weight=2.0,
+        #                         upper_weight=2.0)
         losses  = ['labels', 'curves', 'cardinality']
 
         if aux_loss:
@@ -257,7 +275,8 @@ class AELoss(nn.Module):
                 save,
                 viz_split,
                 outputs,
-                targets):
+                targets,
+                **kwargs):
 
         gt_cluxy = [tgt[0] for tgt in targets[1:]]
         loss_dict, indices = self.criterion(outputs, gt_cluxy)
@@ -304,7 +323,9 @@ class AELoss(nn.Module):
                                         tgt_labels=tgt_labels,
                                         pred_curves=pred_clua3a2a1a0,
                                         pred_labels=pred_labels,
-                                        prefix=save_path)
+                                        prefix=save_path,
+                                        **kwargs
+                                        )
 
         return (losses, loss_dict_reduced, loss_dict_reduced_unscaled,
                 loss_dict_reduced_scaled, loss_value)

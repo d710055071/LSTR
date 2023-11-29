@@ -1,8 +1,8 @@
 {
     "system": {
         "dataset": "MxTUSIMPLE_NEW",
-        "batch_size": 16,
-        "chunk_sizes": [16],
+        "batch_size": 32,
+        "chunk_sizes": [32],
 
         "sampling_function": "kp_detection",
 
@@ -14,7 +14,7 @@
         "decay_rate": 10,
 
         "val_iter": 1000,
-        "display": 500,
+        "display": 100,
 
         "opt_algo": "adam",
         "prefetch_size": 5,
@@ -33,14 +33,13 @@
         "attn_dim": 32,
         "dim_feedforward": 128,
 
-        "kps_dim": 8,
+        "lsp_dim": 7,
 
         "num_heads": 2,
         "enc_layers": 2,
         "dec_layers": 2,
         "block": "BasicBlock",
-        "num_queries": 40,
-
+        "num_queries": 16,
         "lane_categories":17
     },
     

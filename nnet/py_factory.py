@@ -72,7 +72,8 @@ class NetworkFactory(object):
 
         if system_configs.opt_algo == "adam":
             self.optimizer = torch.optim.Adam(
-                filter(lambda p: p.requires_grad, self.model.parameters())
+                filter(lambda p: p.requires_grad, self.model.parameters()),
+                lr=system_configs.learning_rate, 
             )
         elif system_configs.opt_algo == "sgd":
             self.optimizer = torch.optim.SGD(
@@ -88,7 +89,8 @@ class NetworkFactory(object):
             )
         else:
             raise ValueError("unknown optimizer")
-
+        # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=10, gamma=0.99)
+        
     def cuda(self):
         self.model.cuda()
 
@@ -113,7 +115,8 @@ class NetworkFactory(object):
                                save,
                                viz_split,
                                xs,
-                               ys)
+                               ys,
+                               **kwargs)
 
         loss      = loss_kp[0]
         loss_dict = loss_kp[1:]
@@ -121,7 +124,7 @@ class NetworkFactory(object):
 
         loss.backward()
         self.optimizer.step()
-
+        # self.scheduler.step()
         return loss, loss_dict
 
     def val(self,
@@ -158,7 +161,7 @@ class NetworkFactory(object):
         print("setting learning rate to: {}".format(lr))
         for param_group in self.optimizer.param_groups:
             param_group["lr"] = lr
-
+        # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=100, gamma=0.99)
     def load_pretrained_params(self, pretrained_model):
         print("loading from {}".format(pretrained_model))
         with open(pretrained_model, "rb") as f:
@@ -178,7 +181,7 @@ class NetworkFactory(object):
             model_dict.update(pretrained_dict)
 
             self.model.load_state_dict(model_dict)
-    def resume_from(self,checkpoint):
+    def resume_from(self,checkpoint,step_size = 1500):
         start_iter = 0
         min_loss = None
         if checkpoint:
@@ -186,7 +189,9 @@ class NetworkFactory(object):
             self.model.load_state_dict(ckpt["model"])
             self.optimizer.load_state_dict(ckpt["optimizer"])
             start_iter = ckpt["start_iter"]
-            min_loss = ckpt["min_val_loss"]
+            if "min_val_loss" in ckpt:
+                min_loss = ckpt["min_val_loss"]
+            # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=step_size, gamma=0.99)
         return start_iter,min_loss
     # def save_params(self, iteration):
     #     cache_file = system_configs.snapshot_file.format(iteration)

@@ -60,14 +60,14 @@ class HungarianMatcher(nn.Module):
         weights = weights / torch.max(weights)
 
         tgt_ys = tgt_points[:, tgt_points.shape[1] // 2:]
-        out_polys = out_bbox[:, :, 2:].view((-1, 6))
+        out_polys = out_bbox[:, :, 2:].view((-1, 5))
         tgt_ys = tgt_ys.repeat(out_polys.shape[0], 1, 1)
         tgt_ys = tgt_ys.transpose(0, 2)
         tgt_ys = tgt_ys.transpose(0, 1)
 
         # Calculate the predicted xs
         out_xs = out_polys[:, 0] / (tgt_ys - out_polys[:, 1]) ** 2 + out_polys[:, 2] / (tgt_ys - out_polys[:, 1]) + \
-                 out_polys[:, 3] + out_polys[:, 4] * tgt_ys - out_polys[:, 5]
+                 out_polys[:, 3] + out_polys[:, 4] * tgt_ys - out_polys[:, 1]*out_polys[:, 4]
         tgt_xs = tgt_xs.repeat(out_polys.shape[0], 1, 1)
         tgt_xs = tgt_xs.transpose(0, 2)
         tgt_xs = tgt_xs.transpose(0, 1)
@@ -87,7 +87,6 @@ class HungarianMatcher(nn.Module):
         return [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
 
 
-def build_matcher(set_cost_class,
-                  curves_weight, lower_weight, upper_weight):
-    return HungarianMatcher(cost_class=set_cost_class,
-                            curves_weight=curves_weight, lower_weight=lower_weight, upper_weight=upper_weight)
+def build_matcher(set_cost_class,curves_weight, lower_weight, upper_weight):
+    return HungarianMatcher()
+    #return HungarianMatcher(cost_class=set_cost_class,curves_weight=curves_weight, lower_weight=lower_weight, upper_weight=upper_weight)
